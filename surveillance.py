@@ -6,24 +6,24 @@ import time
 import random
 import struct
 import numpy as np
-import cv
+#import cv
 import cv2
 
 from subprocess import call
 
 # Our IP address
-UDP_IP_HOST = "192.168.1.1"
+UDP_IP_HOST = "10.29.32.7"
 UDP_PORT_HOST = 5123 # arbitrary
 
 # Camera IP address and UDP port
-UDP_IP_TARGET = "192.168.1.2"
+UDP_IP_TARGET = "10.29.32.14"
 UDP_PORT_TARGET = 5000
 
 # network socket timeout in seconds
 SOCKET_TIMEOUT = 2
 
 # Location of image recordings
-SAVE_DIR = "/mnt/imagestore/"
+SAVE_DIR = "record"
 
 # Nb of UDP packets to receive to get one full image.
 # Packets are typically 904 bytes, 80 packets is about 70kB, which is enough
@@ -49,8 +49,8 @@ BEEP_COOLDOWN_TIME = 60.0
 MONITORING_PERIOD = 900
 
 # Name of the directory to save image to : also impact how often a new directory is created.
-CAPTURE_NAME = "%Y-%m-%d"
-#CAPTURE_NAME = "%Y-%m-%d_%Hh"
+#CAPTURE_NAME = "%Y-%m-%d"
+CAPTURE_NAME = "%Y-%m-%d_%Hh_%mm_%Ss"
 
 def byteToInt(byteVal):
 	return struct.unpack('B', byteVal[0])[0]
@@ -142,7 +142,7 @@ msg = bytearray()
 capturePath = SAVE_DIR + time.strftime(CAPTURE_NAME)
 if not os.path.exists(capturePath): 
 	os.makedirs(capturePath)
-video_out = cv2.VideoWriter(capturePath+"/"+'capture.avi',cv.CV_FOURCC('X','V','I','D'), 4.0, (640,480))
+video_out = cv2.VideoWriter(capturePath+"/"+'capture.avi',cv2.VideoWriter_fourcc('X','V','I','D'), 4.0, (320,240))
 if not video_out.isOpened():
 	print("[ERROR] unable to open video file in %s" % capturePath)
 	
@@ -190,18 +190,18 @@ try:
 			GRAYImagePrev = None
 			
 			#RunningAverageImage = None
-			if os.path.exists("detectionmask.png"): 
-				DetectionMask = cv2.imread("detectionmask.png", cv2.CV_LOAD_IMAGE_GRAYSCALE)
-			else:
-				DetectionMask = np.zeros((480,640), np.uint8)
-				DetectionMask[:] = 255
+			# if os.path.exists("detectionmask.png"): 
+			# 	DetectionMask = cv2.imread("detectionmask.png", cv2.CV_LOAD_IMAGE_GRAYSCALE)
+			# else:
+			# 	DetectionMask = np.zeros((240,320), np.uint8)
+			# 	DetectionMask[:] = 255
 				#dumpDebugImage(capturePath, "generated_mask", DetectionMask, ".png")
 			
-			# Initialize video file output
+			#Initialize video file output
 			# capturePath = SAVE_DIR + time.strftime("%Y-%m-%d_%H")
 			# if not os.path.exists(capturePath): 
-				# os.makedirs(capturePath)
-			# video_out = cv2.VideoWriter(capturePath+"/"+'capture.avi',cv.CV_FOURCC('X','V','I','D'), 4.0, (640,480))
+			# 	os.makedirs(capturePath)
+			# video_out = cv2.VideoWriter(capturePath+"/"+'capture.avi',cv2.VideoWriter_fourcc('X','V','I','D'), 4.0, (320,240))
 			
 			#######################
 			# NETWORK RELATED SETUP
@@ -272,18 +272,18 @@ try:
 			sendControlPacket(MESSAGE_34)
 
 			sendControlPacket(MESSAGE_119)
-			try:
-				nbReceived = receiveControlPacket(buffer)
-				# Sometimes the 42 bytes packet comes at this point: discard it and re-read
-				if(nbReceived == 42):
-					print("[CONTROL] received 42 late, re-reading")
-					nbReceived = receiveControlPacket(buffer)
-				if (nbReceived != 368):
-					raise RestartException("Expected 368 bytes, received %d" % nbReceived,15)
-			except socket.timeout:
-				raise RestartException("Socket timeout 4",15)
-			except KeyboardInterrupt:
-				raise
+			# try:
+			# 	nbReceived = receiveControlPacket(buffer)
+			# 	# Sometimes the 42 bytes packet comes at this point: discard it and re-read
+			# 	if(nbReceived == 42):
+			# 		print("[CONTROL] received 42 late, re-reading")
+			# 		nbReceived = receiveControlPacket(buffer)
+			# 	if (nbReceived != 368):
+			# 		raise RestartException("Expected 368 bytes, received %d" % nbReceived,15)
+			# except socket.timeout:
+			# 	raise RestartException("Socket timeout 4",15)
+			# except KeyboardInterrupt:
+			# 	raise
 				
 			# reception packet TAPA 410 & paquet 42 bytes
 			#receiveControlPacket(buffer)
@@ -358,45 +358,46 @@ try:
 							now = time.time()
 							
 							# Convert raw data buffer to OpenCV image format
-							RGBImageNext = cv2.imdecode(np.fromstring(jpeg, dtype=np.uint8),cv2.CV_LOAD_IMAGE_COLOR)
+							RGBImageNext = cv2.imdecode(np.fromstring(jpeg, dtype=np.uint8),cv2.IMREAD_COLOR)
 							
 							# Create a grayscale version of the image for analysis
 							GRAYImageNext = cv2.cvtColor(RGBImageNext,cv2.COLOR_BGR2GRAY)
 							
 							# Launch motion detection 
-							if (imageIndex > 2):
-								d1 = cv2.absdiff(GRAYImagePrev, GRAYImageNext)
-								d2 = cv2.absdiff(GRAYImageCurrent, GRAYImageNext)
-								#result = np.zeros(d1.shape)
-								result = cv2.bitwise_and(d1, d2)
-								#masked_result = np.zeros(result.shape)
-								masked_result = cv2.bitwise_and(result, DetectionMask)
-								thresholded = cv2.threshold(masked_result, ABSDIFF_THRESHOLD_LEVEL, 255, cv2.THRESH_BINARY)
-								nbDifferences = cv2.countNonZero(thresholded[1])
+							# if (imageIndex > 2):
+							# 	d1 = cv2.absdiff(GRAYImagePrev, GRAYImageNext)
+							# 	d2 = cv2.absdiff(GRAYImageCurrent, GRAYImageNext)
+							# 	#result = np.zeros(d1.shape)
+							# 	result = cv2.bitwise_and(d1, d2)
+							# 	#masked_result = np.zeros(result.shape)
+							# 	#masked_result = cv2.bitwise_and(result, DetectionMask)
+							# 	thresholded = cv2.threshold(result, ABSDIFF_THRESHOLD_LEVEL, 255, cv2.THRESH_BINARY)
+							# 	nbDifferences = cv2.countNonZero(thresholded[1])
 								
-								# DEBUG / Experimental
-								#cv2.accumulateWeighted(GRAYImageNext,RunningAverageImage,0.5)
-								#avg_image = cv2.convertScaleAbs(RunningAverageImage)
+							# 	# DEBUG / Experimental
+							# 	#cv2.accumulateWeighted(GRAYImageNext,RunningAverageImage,0.5)
+							# 	#avg_image = cv2.convertScaleAbs(RunningAverageImage)
 							
-							# Skip detection for the first two frames
-							else:
-								#RunningAverageImage = np.float32(GRAYImageNext)
-								nbDifferences = 0
+							# # Skip detection for the first two frames
+							# else:
+							# 	#RunningAverageImage = np.float32(GRAYImageNext)
+							# 	nbDifferences = 0
 
 							motion_detected = False
 							
-							if ( (nbDifferences > NB_DIFFERENCES_THRESHOLD_MIN) and (nbDifferences < NB_DIFFERENCES_THRESHOLD_MAX) and (imageIndex != 0)):
+							#if ( (nbDifferences > NB_DIFFERENCES_THRESHOLD_MIN) and (nbDifferences < NB_DIFFERENCES_THRESHOLD_MAX) and (imageIndex != 0)):
+							if (True):
 								
 								# Play a sound to signal the detection, but not too often.
-								if (now - latestBeepTime) > BEEP_COOLDOWN_TIME:
-									call(["aplay", "-q", "beepbeep.wav"])
-									print("[CONTROL] Playing detection sound on %s" % time.strftime("%Y-%m-%d @ %H:%M:%S"))
-									latestBeepTime = now
+								# if (now - latestBeepTime) > BEEP_COOLDOWN_TIME:
+								# 	call(["aplay", "-q", "beepbeep.wav"])
+								# 	print("[CONTROL] Playing detection sound on %s" % time.strftime("%Y-%m-%d @ %H:%M:%S"))
+								# 	latestBeepTime = now
 									
-								motion_detected = True
+								motion_detected = False
 								
 								# Handle the case of a new/fresh detection
-								if captureInProgress == False:
+								if True:
 									
 									captureInProgress = True
 									print("[DATA] image %d on %s: MOTION DETECTED" % (imageIndex, time.strftime("%Y-%m-%d @ %H:%M:%S")))
@@ -407,20 +408,20 @@ try:
 									# Create new dir for storing this sequence
 									capturePath = SAVE_DIR + time.strftime(CAPTURE_NAME)
 									# This is a new day : open new video file (create directory if required)
-									if not os.path.isfile(capturePath+"/"+'capture.avi'): 
-										if not os.path.exists(capturePath):
-											print("[CONTROL] Creating directory %s" % capturePath)
-											os.makedirs(capturePath)
+									# if not os.path.isfile(capturePath+"/"+'capture.avi'): 
+									# 	if not os.path.exists(capturePath):
+									# 		print("[CONTROL] Creating directory %s" % capturePath)
+									# 		os.makedirs(capturePath)
 									
-										# reinitialize daily video file (note : will overwrite exiting one from the same day if it already exists, because
-										# there is no way to reopen an existing file with VideoWriter)
-										video_out = cv2.VideoWriter(capturePath+"/"+'capture.avi',cv.CV_FOURCC('X','V','I','D'), 30.0, (640,480))
-										if not video_out.isOpened():
-											print("[ERROR] unable to open video file %s" % capturePath+"/"+'capture.avi')
-										else:
-											print("[CONTROL] opened new video capture file %s" % capturePath+"/"+'capture.avi')
-									else:
-										print("[CONTROL] Reusing existing video file %s" % capturePath+"/"+'capture.avi')
+									# 	# reinitialize daily video file (note : will overwrite exiting one from the same day if it already exists, because
+									# 	# there is no way to reopen an existing file with VideoWriter)
+									# 	video_out = cv2.VideoWriter(capturePath+"/"+'capture.avi',cv2.VideoWriter_fourcc('X','V','I','D'), 30.0, (320,240))
+									# 	if not video_out.isOpened():
+									# 		print("[ERROR] unable to open video file %s" % capturePath+"/"+'capture.avi')
+									# 	else:
+									# 		print("[CONTROL] opened new video capture file %s" % capturePath+"/"+'capture.avi')
+									# else:
+									# 	print("[CONTROL] Reusing existing video file %s" % capturePath+"/"+'capture.avi')
 									
 									# DEBUG
 									#dumpDebugImage(capturePath, "absdif_thresholded", thresholded[1], ".png")
@@ -432,23 +433,24 @@ try:
 									#capturedImageIndex +=1
 										
 									# Record the last 2 images (N-2 and N-1) and the difference image that triggered the detection
-									recordImage(video_out, RGBImagePrev)
-									recordImage(video_out, RGBImageCurrent)
+									#recordImage(video_out, RGBImagePrev)
+									#recordImage(video_out, RGBImageCurrent)
 										
 								# In any case, start (or re-start) the recording of N consecutive images
 								imagesToCapture = NB_IMAGES_CAPTURED_UPON_DETECTION
 							
-							if (motion_detected or imagesToCapture > 0):							
-								# DEBUG
-								# dumpDebugImage(capturePath, "capture"+str(capturedImageIndex), RGBImageNext, ".jpg")
-								
-								recordImage(video_out, RGBImageNext)
-								imagesToCapture -=1
-								
-								if imagesToCapture == 0:
-									captureInProgress = False
-										
-								capturedImageIndex +=1
+							#if (motion_detected or imagesToCapture > 0):
+
+							# DEBUG
+							# dumpDebugImage(capturePath, "capture"+str(capturedImageIndex), RGBImageNext, ".jpg")
+							
+							recordImage(video_out, RGBImageNext)
+							imagesToCapture -=1
+							
+							if imagesToCapture == 0:
+								captureInProgress = False
+									
+							capturedImageIndex +=1
 							
 							# Unconditionally save a frame periodically
 							#if (now - latestImageMonitoringTime) > MONITORING_PERIOD:
